@@ -1,5 +1,21 @@
 import os
+import csv
 import time
+
+
+def make_csv_log(result_dict):
+    log_name = 'detect_log.csv'
+    if os.path.exists(log_name):
+        mode = 'a'  # Дописываем в существующий файл
+    else:
+        mode = 'w'  # Создаем новый файл
+
+    with open(log_name, mode, newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=result_dict.keys())
+        if mode == 'w':
+            writer.writeheader()
+
+        writer.writerow(result_dict)
 
 
 def format_time(seconds):
@@ -42,7 +58,7 @@ CAM_AREAS = {
 
 CLASSES_TO_DETECT = [2, 3, 7]  # ищем машины, мотоциклы, грузовики
 
-FRAMES_SKIP = 4  # пропуск части кадров в видео для ускорения работы
+FRAMES_SKIP = 5  # пропуск части кадров в видео для ускорения работы
 
 
 def get_cam_id(filename):
@@ -87,7 +103,7 @@ def show_image(image_in):
 
 
 def yolo_obj_detect(image_in):
-    predictions = model.predict(image_in, classes=CLASSES_TO_DETECT, save_txt=True)
+    predictions = model.predict(image_in, conf=0.5, classes=CLASSES_TO_DETECT, show_labels=False, show_conf=False, show_boxes=False)
 
     return predictions
 
@@ -101,7 +117,7 @@ def is_obj_motion(result):
 
 
 @timer
-def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=False):
+def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=False, files_dir=None):
     if not is_path_exist():
         print(f'Путь {SOURCE_DIR} к обрабатываемым файлам не найден')
         return
@@ -114,6 +130,7 @@ def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=Fa
     cap = cv2.VideoCapture(video_path)
     frame_counter = 0
     detection_counter = 0
+    img_size_counter = 0
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -130,7 +147,7 @@ def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=Fa
                 if is_obj_detected(result) and is_obj_motion(result):
                     detection_counter += 1
                     frame_filename = f"{video_filename}_{frame_counter}.jpg"
-                    frame_path = os.path.join(CURRENT_DIR, RESULT_DIR, frame_filename)
+                    frame_path = os.path.join(CURRENT_DIR, RESULT_DIR, files_dir, frame_filename)
                     if show_img:
                         cv2.imshow('Frame', frame_crop)
 
@@ -138,6 +155,8 @@ def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=Fa
                         break
 
                     cv2.imwrite(frame_path, frame)  # Сохранение кадра если обнаружен объект
+                    img_size_counter += os.path.getsize(frame_path)  # размер в байтах
+
             except Exception as e:
                 print(f'Произошла ошибка при обработке кадра {frame_counter}: {str(e)}')
                 continue  # Пропуск битого кадра и продолжение выполнения
@@ -145,19 +164,37 @@ def video_proceed(video_filename, cam_id=tuple(CAM_AREAS.keys())[0], show_img=Fa
     cap.release()
     cv2.destroyAllWindows()
 
-    print(f'Сохранено {detection_counter} файлов в {RESULT_DIR}')
+    print(f'Сохранено {detection_counter} файлов в {RESULT_DIR}/{files_dir}. Общий размер {img_size_counter} байт.')
+    return {
+        'images_qty': detection_counter,
+        'total_size_mb': round(img_size_counter / (1024 * 1024), 2),
+        'video_filename': video_filename
+    }
 
 
-def video_path_proceed(show_img=False, files_extention='mp4'):
+def video_path_proceed(show_img=False, create_dir=True, files_extension='mp4', csv_log=True):
     video_path = os.path.join(CURRENT_DIR, SOURCE_DIR)
     if not os.path.exists(video_path):
         print(f'Путь {video_path} к обрабатываемым файлам не найден')
         return
 
-    files_list = [file for file in os.listdir(video_path) if file.endswith(files_extention)]
+    files_list = [file for file in os.listdir(video_path) if file.endswith(files_extension)]
+
+    if not is_path_exist():
+        print(f'Путь {SOURCE_DIR} к обрабатываемым файлам не найден')
+        return
 
     for file in files_list:
-        video_proceed(file, cam_id=get_cam_id(file), show_img=show_img)
+
+        if create_dir:
+            files_dir = file
+            os.mkdir(os.path.join(CURRENT_DIR, RESULT_DIR, files_dir))
+        else:
+            files_dir = None
+
+        result = video_proceed(file, cam_id=get_cam_id(file), show_img=show_img, files_dir=files_dir)
+        if csv_log:
+            make_csv_log(result)
 
 
 if __name__ == '__main__':
