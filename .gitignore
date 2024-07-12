@@ -114,4 +114,11 @@ fabric.properties
 
 
 *.pt
+*.h5
+
+_result/
+_source/
+datasets/
+venv/
+
 
