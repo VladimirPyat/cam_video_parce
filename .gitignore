@@ -118,6 +118,7 @@ fabric.properties
 
 _result/
 _source/
+_no_doubles/
 datasets/
 venv/
 

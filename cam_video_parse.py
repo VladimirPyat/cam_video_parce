@@ -116,8 +116,8 @@ def save_crop(image_out, result_path, image_filename_out):
     cv2.imwrite(frame_path, image_out)
 
 
-def image_show(image_in):
-    cv2.imshow('Detected Objects', image_in)
+def image_show(image_in, label='Object'):
+    cv2.imshow(label, image_in)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 

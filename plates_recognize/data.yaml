@@ -1,0 +1,12 @@
+path: '../drive/MyDrive/yolo8/datasets/car_license_plates_rus.v6i.yolov8-obb'
+
+train: train/images
+val: val/images
+test: test/images
+
+label_train: train/labels
+label_val: val/labels
+label_test: test/labels
+
+nc: 1
+names: ['plate']
